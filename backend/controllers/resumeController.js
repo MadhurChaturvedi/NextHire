@@ -1,0 +1,277 @@
+const Resume = require('../models/Resume');
+const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
+
+// @desc    Upload resume and parse initial details
+// @route   POST /api/resumes/upload
+// @access  Private
+const uploadResume = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please upload a file' });
+    }
+
+    const absolutePath = path.resolve(req.file.path);
+
+    // Call Python Service /parse endpoint
+    let parseResult;
+    try {
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/parse`, {
+        file_path: absolutePath
+      });
+      parseResult = response.data;
+    } catch (apiError) {
+      console.error('Python NLP Service parsing error:', apiError.message);
+      // Clean up uploaded file if parsing fails
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+      }
+      return res.status(502).json({
+        success: false,
+        message: 'AI Parsing service is temporarily offline. Please make sure it is running.',
+        error: apiError.message
+      });
+    }
+
+    // Save to MongoDB
+    const resume = await Resume.create({
+      userId: req.user.id,
+      filename: req.file.originalname,
+      filepath: absolutePath,
+      extractedText: parseResult.text,
+      skills: parseResult.skills,
+      parsedData: {
+        name: parseResult.contact.name || 'Unknown',
+        email: parseResult.contact.email || '',
+        phone: parseResult.contact.phone || '',
+        education: parseResult.structure.education || '',
+        experience: parseResult.structure.experience || '',
+        certifications: parseResult.structure.certifications || '',
+        projects: parseResult.structure.projects || ''
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Resume uploaded and parsed successfully',
+      resume
+    });
+  } catch (error) {
+    // Cleanup file in case of error
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Analyze resume against target job role
+// @route   POST /api/resumes/analyze
+// @access  Private
+const analyzeResume = async (req, res) => {
+  try {
+    const { resumeId, targetRole } = req.body;
+
+    if (!resumeId || !targetRole) {
+      return res.status(400).json({ success: false, message: 'Please provide resumeId and targetRole' });
+    }
+
+    const resume = await Resume.findById(resumeId);
+    if (!resume) {
+      return res.status(404).json({ success: false, message: 'Resume not found' });
+    }
+
+    // Make sure user owns this resume
+    if (resume.userId.toString() !== req.user.id.toString()) {
+      return res.status(401).json({ success: false, message: 'Not authorized to analyze this resume' });
+    }
+
+    // Call Python Service /analyze endpoint
+    let analyzeResult;
+    try {
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/analyze`, {
+        text: resume.extractedText || '',
+        skills: resume.skills || [],
+        target_role: targetRole
+      });
+      analyzeResult = response.data;
+    } catch (apiError) {
+      console.error('Python NLP Service analysis error:', apiError.message);
+      return res.status(502).json({
+        success: false,
+        message: 'AI Analysis service is offline. Please check Python service.',
+        error: apiError.message
+      });
+    }
+
+    // Update Resume document with score and recommendations
+    resume.score = {
+      overall: analyzeResult.score.overall,
+      skillRelevance: analyzeResult.score.skillRelevance,
+      keywordDensity: analyzeResult.score.keywordDensity,
+      structureScore: analyzeResult.score.structureScore,
+      checks: analyzeResult.score.checks || []
+    };
+
+    resume.recommendations = {
+      targetRole: targetRole,
+      missingSkills: analyzeResult.missingSkills || [],
+      roadmap: analyzeResult.roadmap || [],
+      recommendedProjects: analyzeResult.recommendedProjects || [],
+      recommendedCertifications: analyzeResult.recommendedCertifications || [],
+      interviewPrep: analyzeResult.interviewPrep || { technical_questions: [], behavioral_guidance: '', role_specific_focus: '' }
+    };
+
+    await resume.save();
+
+    res.json({
+      success: true,
+      message: 'Resume analyzed successfully',
+      resume
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get resume analysis by ID
+// @route   GET /api/resumes/:id
+// @access  Private
+const getResumeAnalysis = async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ success: false, message: 'Resume analysis not found' });
+    }
+
+    // Check ownership
+    if (resume.userId.toString() !== req.user.id.toString()) {
+      return res.status(401).json({ success: false, message: 'Not authorized to view this analysis' });
+    }
+
+    res.json({
+      success: true,
+      resume
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get all resume uploads for the current user
+// @route   GET /api/resumes/history
+// @access  Private
+const getResumeHistory = async (req, res) => {
+  try {
+    const history = await Resume.find({ userId: req.user.id })
+      .select('-extractedText') // exclude full text to reduce payload size
+      .sort({ uploadedAt: -1 });
+
+    res.json({
+      success: true,
+      count: history.length,
+      history
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Delete a resume from history
+// @route   DELETE /api/resumes/:id
+// @access  Private
+const deleteResume = async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ success: false, message: 'Resume not found' });
+    }
+
+    // Check ownership
+    if (resume.userId.toString() !== req.user.id.toString()) {
+      return res.status(401).json({ success: false, message: 'Not authorized to delete this resume' });
+    }
+
+    // Delete local file if it exists
+    if (resume.filepath && fs.existsSync(resume.filepath)) {
+      try {
+        fs.unlinkSync(resume.filepath);
+      } catch (err) {
+        console.error('Error deleting local file:', err.message);
+      }
+    }
+
+    await resume.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'Resume deleted successfully'
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Generate career recommendations based on custom target role & skills selection
+// @route   POST /api/resumes/career-recommendation
+// @access  Private
+const postCareerRecommendation = async (req, res) => {
+  try {
+    const { targetRole, skills } = req.body;
+
+    if (!targetRole || !skills) {
+      return res.status(400).json({ success: false, message: 'Please provide targetRole and skills' });
+    }
+
+    // Call Python Service /analyze endpoint with custom variables
+    let analyzeResult;
+    try {
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/analyze`, {
+        text: `Custom search with skills: ${skills.join(', ')}`,
+        skills: skills,
+        target_role: targetRole
+      });
+      analyzeResult = response.data;
+    } catch (apiError) {
+      console.error('Python NLP Service custom analysis error:', apiError.message);
+      return res.status(502).json({
+        success: false,
+        message: 'AI service is offline. Please make sure the Python engine is running.',
+        error: apiError.message
+      });
+    }
+
+    res.json({
+      success: true,
+      recommendations: {
+        targetRole,
+        matchingSkills: analyzeResult.matchingSkills,
+        missingSkills: analyzeResult.missingSkills,
+        roadmap: analyzeResult.roadmap,
+        recommendedProjects: analyzeResult.recommendedProjects,
+        recommendedCertifications: analyzeResult.recommendedCertifications,
+        interviewPrep: analyzeResult.interviewPrep
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  uploadResume,
+  analyzeResume,
+  getResumeAnalysis,
+  getResumeHistory,
+  deleteResume,
+  postCareerRecommendation
+};

@@ -1,0 +1,78 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+const connectDB = require('./config/db');
+const seedRoles = require('./config/seed');
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const resumeRoutes = require('./routes/resumeRoutes');
+
+// Connect to MongoDB Database
+connectDB().then(() => {
+  // Pre-populate CareerRoles if empty
+  seedRoles();
+});
+
+const app = express();
+
+// Security Middlewares
+app.use(helmet({
+  crossOriginResourcePolicy: false // Allow loading files from server in browser if needed
+}));
+
+// CORS Configuration
+app.use(cors({
+  origin: '*', // Allow all origins for local development/testing
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Body parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Rate Limiter configuration (100 requests per 15 minutes)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again after 15 minutes.'
+  }
+});
+app.use('/api/', limiter);
+
+// Mount Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/resumes', resumeRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ success: true, message: 'NextHire backend server is healthy and running.' });
+});
+
+// Root endpoint redirection
+app.get('/', (req, res) => {
+  res.send('NextHire MERN Backend is running.');
+});
+
+// Centralized error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled Error:', err.message);
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running in development mode on port ${PORT}`);
+});
