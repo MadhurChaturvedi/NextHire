@@ -1,0 +1,20 @@
+# Virtual Environment
+ai-service/venv/
+temp_uploads/
+
+# Node.js
+node_modules/
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment variables
+.env
+.env.local
+
+# Production builds
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
