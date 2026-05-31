@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrainCircuit, Layers, Percent, RoadmapIcon, Compass, Sparkles, Terminal, ShieldAlert } from 'lucide-react';
+import { BrainCircuit, Layers, Percent, Compass, Sparkles, Terminal, ShieldAlert } from 'lucide-react';
 
 const Features = () => {
   return (

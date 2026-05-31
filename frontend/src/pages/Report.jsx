@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { ArrowLeft, CheckCircle, XCircle, Sparkles, Target, Calendar, ArrowRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Sparkles, Target, Calendar, ArrowRight, FileText, Award } from 'lucide-react';
 
 const Report = () => {
   const { id } = useParams();
@@ -47,7 +47,10 @@ const Report = () => {
     );
   }
 
-  const { score, recommendations, filename, uploadedAt, parsedData, skills } = resume;
+  const { score, recommendations, filename, uploadedAt, parsedData, skills } = resume || {};
+
+  // If no score yet (resume uploaded but not analyzed), show a prompt
+  const isAnalyzed = score && score.overall !== undefined;
 
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors py-12">
@@ -82,6 +85,7 @@ const Report = () => {
         </div>
 
         {/* Score Card */}
+        {isAnalyzed ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/40 dark:border-slate-800/40 text-center">
             <div className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400">{score?.overall || '—'}</div>
@@ -96,6 +100,13 @@ const Report = () => {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Keyword Similarity</p>
           </div>
         </div>
+        ) : (
+        <div className="mb-8 p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/40 dark:border-amber-800/20 text-center">
+          <p className="text-amber-700 dark:text-amber-400 font-medium mb-2">This resume hasn't been analyzed yet.</p>
+          <p className="text-sm text-amber-600 dark:text-amber-500 mb-4">Go back to the Dashboard and click "Analyze ATS Match" to run an analysis against a target role.</p>
+          <button onClick={() => navigate('/dashboard')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-colors">Go to Dashboard</button>
+        </div>
+        )}
 
         {/* Skills */}
         <div className="mb-8">

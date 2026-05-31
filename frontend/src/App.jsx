@@ -10,6 +10,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Report from './pages/Report';
+import Profile from './pages/Profile';
+import CareerSuggestions from './pages/CareerSuggestions';
 import PrivateRoute from './components/PrivateRoute';
 
 const App = () => {
@@ -29,6 +31,8 @@ const App = () => {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/upload" element={<Upload />} />
                 <Route path="/report/:id" element={<Report />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/career/:role" element={<CareerSuggestions />} />
               </Route>
               {/* Fallback redirect */}
               <Route path="*" element={<Navigate to="/" replace />} />

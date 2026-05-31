@@ -10,6 +10,7 @@ const seedRoles = require('./config/seed');
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const resumeRoutes = require('./routes/resumeRoutes');
+const careerRoleRoutes = require('./routes/careerRoleRoutes');
 
 // Connect to MongoDB Database
 connectDB().then(() => {
@@ -52,6 +53,7 @@ app.use('/api/', limiter);
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/resumes', resumeRoutes);
+app.use('/api/career-roles', careerRoleRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
