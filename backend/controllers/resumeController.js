@@ -1,9 +1,11 @@
-const Resume = require('../models/Resume');
-const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
+const Resume = require("../models/Resume");
+const axios = require("axios");
+const path = require("path");
+const fs = require("fs");
 
-const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
+const PYTHON_SERVICE_URL =
+  process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
+const mockAi = require("../utils/mockAi");
 
 // @desc    Upload resume and parse initial details
 // @route   POST /api/resumes/upload
@@ -11,29 +13,30 @@ const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8
 const uploadResume = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please upload a file' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please upload a file" });
     }
 
     const absolutePath = path.resolve(req.file.path);
 
-    // Call Python Service /parse endpoint
+    // Call Python Service /parse endpoint. Fallback to mock AI if service unreachable.
     let parseResult;
     try {
-      const response = await axios.post(`${PYTHON_SERVICE_URL}/parse`, {
-        file_path: absolutePath
-      });
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/parse`,
+        {
+          file_path: absolutePath,
+        },
+        { timeout: 5000 },
+      );
       parseResult = response.data;
     } catch (apiError) {
-      console.error('Python NLP Service parsing error:', apiError.message);
-      // Clean up uploaded file if parsing fails
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
-      }
-      return res.status(502).json({
-        success: false,
-        message: 'AI Parsing service is temporarily offline. Please make sure it is running.',
-        error: apiError.message
-      });
+      console.warn(
+        "Python NLP Service parsing error, using local fallback:",
+        apiError.message,
+      );
+      parseResult = await mockAi.parse(absolutePath);
     }
 
     // Save to MongoDB
@@ -44,20 +47,20 @@ const uploadResume = async (req, res) => {
       extractedText: parseResult.text,
       skills: parseResult.skills,
       parsedData: {
-        name: parseResult.contact.name || 'Unknown',
-        email: parseResult.contact.email || '',
-        phone: parseResult.contact.phone || '',
-        education: parseResult.structure.education || '',
-        experience: parseResult.structure.experience || '',
-        certifications: parseResult.structure.certifications || '',
-        projects: parseResult.structure.projects || ''
-      }
+        name: parseResult.contact.name || "Unknown",
+        email: parseResult.contact.email || "",
+        phone: parseResult.contact.phone || "",
+        education: parseResult.structure.education || "",
+        experience: parseResult.structure.experience || "",
+        certifications: parseResult.structure.certifications || "",
+        projects: parseResult.structure.projects || "",
+      },
     });
 
     res.status(201).json({
       success: true,
-      message: 'Resume uploaded and parsed successfully',
-      resume
+      message: "Resume uploaded and parsed successfully",
+      resume,
     });
   } catch (error) {
     // Cleanup file in case of error
@@ -77,34 +80,53 @@ const analyzeResume = async (req, res) => {
     const { resumeId, targetRole } = req.body;
 
     if (!resumeId || !targetRole) {
-      return res.status(400).json({ success: false, message: 'Please provide resumeId and targetRole' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please provide resumeId and targetRole",
+        });
     }
 
     const resume = await Resume.findById(resumeId);
     if (!resume) {
-      return res.status(404).json({ success: false, message: 'Resume not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Resume not found" });
     }
 
     // Make sure user owns this resume
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res.status(401).json({ success: false, message: 'Not authorized to analyze this resume' });
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: "Not authorized to analyze this resume",
+        });
     }
 
-    // Call Python Service /analyze endpoint
+    // Call Python Service /analyze endpoint. Fallback to mock AI if service unreachable.
     let analyzeResult;
     try {
-      const response = await axios.post(`${PYTHON_SERVICE_URL}/analyze`, {
-        text: resume.extractedText || '',
-        skills: resume.skills || [],
-        target_role: targetRole
-      });
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/analyze`,
+        {
+          text: resume.extractedText || "",
+          skills: resume.skills || [],
+          target_role: targetRole,
+        },
+        { timeout: 5000 },
+      );
       analyzeResult = response.data;
     } catch (apiError) {
-      console.error('Python NLP Service analysis error:', apiError.message);
-      return res.status(502).json({
-        success: false,
-        message: 'AI Analysis service is offline. Please check Python service.',
-        error: apiError.message
+      console.warn(
+        "Python NLP Service analysis error, using local fallback:",
+        apiError.message,
+      );
+      analyzeResult = await mockAi.analyze({
+        text: resume.extractedText || "",
+        skills: resume.skills || [],
+        target_role: targetRole,
       });
     }
 
@@ -114,7 +136,7 @@ const analyzeResume = async (req, res) => {
       skillRelevance: analyzeResult.score.skillRelevance,
       keywordDensity: analyzeResult.score.keywordDensity,
       structureScore: analyzeResult.score.structureScore,
-      checks: analyzeResult.score.checks || []
+      checks: analyzeResult.score.checks || [],
     };
 
     resume.recommendations = {
@@ -123,15 +145,19 @@ const analyzeResume = async (req, res) => {
       roadmap: analyzeResult.roadmap || [],
       recommendedProjects: analyzeResult.recommendedProjects || [],
       recommendedCertifications: analyzeResult.recommendedCertifications || [],
-      interviewPrep: analyzeResult.interviewPrep || { technical_questions: [], behavioral_guidance: '', role_specific_focus: '' }
+      interviewPrep: analyzeResult.interviewPrep || {
+        technical_questions: [],
+        behavioral_guidance: "",
+        role_specific_focus: "",
+      },
     };
 
     await resume.save();
 
     res.json({
       success: true,
-      message: 'Resume analyzed successfully',
-      resume
+      message: "Resume analyzed successfully",
+      resume,
     });
   } catch (error) {
     console.error(error);
@@ -146,17 +172,24 @@ const getResumeAnalysis = async (req, res) => {
   try {
     const resume = await Resume.findById(req.params.id);
     if (!resume) {
-      return res.status(404).json({ success: false, message: 'Resume analysis not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Resume analysis not found" });
     }
 
     // Check ownership
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res.status(401).json({ success: false, message: 'Not authorized to view this analysis' });
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: "Not authorized to view this analysis",
+        });
     }
 
     res.json({
       success: true,
-      resume
+      resume,
     });
   } catch (error) {
     console.error(error);
@@ -170,13 +203,13 @@ const getResumeAnalysis = async (req, res) => {
 const getResumeHistory = async (req, res) => {
   try {
     const history = await Resume.find({ userId: req.user.id })
-      .select('-extractedText') // exclude full text to reduce payload size
+      .select("-extractedText") // exclude full text to reduce payload size
       .sort({ uploadedAt: -1 });
 
     res.json({
       success: true,
       count: history.length,
-      history
+      history,
     });
   } catch (error) {
     console.error(error);
@@ -191,12 +224,19 @@ const deleteResume = async (req, res) => {
   try {
     const resume = await Resume.findById(req.params.id);
     if (!resume) {
-      return res.status(404).json({ success: false, message: 'Resume not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Resume not found" });
     }
 
     // Check ownership
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res.status(401).json({ success: false, message: 'Not authorized to delete this resume' });
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: "Not authorized to delete this resume",
+        });
     }
 
     // Delete local file if it exists
@@ -204,7 +244,7 @@ const deleteResume = async (req, res) => {
       try {
         fs.unlinkSync(resume.filepath);
       } catch (err) {
-        console.error('Error deleting local file:', err.message);
+        console.error("Error deleting local file:", err.message);
       }
     }
 
@@ -212,7 +252,7 @@ const deleteResume = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Resume deleted successfully'
+      message: "Resume deleted successfully",
     });
   } catch (error) {
     console.error(error);
@@ -228,24 +268,36 @@ const postCareerRecommendation = async (req, res) => {
     const { targetRole, skills } = req.body;
 
     if (!targetRole || !skills) {
-      return res.status(400).json({ success: false, message: 'Please provide targetRole and skills' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please provide targetRole and skills",
+        });
     }
 
-    // Call Python Service /analyze endpoint with custom variables
+    // Call Python Service /analyze endpoint with custom variables. Fallback to mockAi.
     let analyzeResult;
     try {
-      const response = await axios.post(`${PYTHON_SERVICE_URL}/analyze`, {
-        text: `Custom search with skills: ${skills.join(', ')}`,
-        skills: skills,
-        target_role: targetRole
-      });
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/analyze`,
+        {
+          text: `Custom search with skills: ${skills.join(", ")}`,
+          skills: skills,
+          target_role: targetRole,
+        },
+        { timeout: 5000 },
+      );
       analyzeResult = response.data;
     } catch (apiError) {
-      console.error('Python NLP Service custom analysis error:', apiError.message);
-      return res.status(502).json({
-        success: false,
-        message: 'AI service is offline. Please make sure the Python engine is running.',
-        error: apiError.message
+      console.warn(
+        "Python NLP Service custom analysis error, using fallback:",
+        apiError.message,
+      );
+      analyzeResult = await mockAi.analyze({
+        text: `Custom search with skills: ${skills.join(", ")}`,
+        skills,
+        target_role: targetRole,
       });
     }
 
@@ -258,8 +310,8 @@ const postCareerRecommendation = async (req, res) => {
         roadmap: analyzeResult.roadmap,
         recommendedProjects: analyzeResult.recommendedProjects,
         recommendedCertifications: analyzeResult.recommendedCertifications,
-        interviewPrep: analyzeResult.interviewPrep
-      }
+        interviewPrep: analyzeResult.interviewPrep,
+      },
     });
   } catch (error) {
     console.error(error);
@@ -273,5 +325,5 @@ module.exports = {
   getResumeAnalysis,
   getResumeHistory,
   deleteResume,
-  postCareerRecommendation
+  postCareerRecommendation,
 };
