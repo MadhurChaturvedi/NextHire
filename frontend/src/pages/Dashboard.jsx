@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { UploadCloud, FileText, Trash2, Calendar, Target, Award, ArrowRight, Eye, Play, Sparkles } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Calendar, Target, Award, ArrowRight, Eye, Play, Sparkles, MessageSquare } from 'lucide-react';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -182,6 +182,16 @@ const Dashboard = () => {
                             {resume.recommendations?.targetRole}
                           </div>
                           <div className="text-xs text-indigo-500 font-medium mt-0.5">Click to view report</div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/chat?resumeId=${resume._id}`, { state: { resumeId: resume._id } });
+                            }}
+                            className="flex items-center gap-1 mt-1 text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer ml-auto"
+                          >
+                            <MessageSquare size={12} />
+                            Chat with AI
+                          </button>
                         </div>
 
                         <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/10">

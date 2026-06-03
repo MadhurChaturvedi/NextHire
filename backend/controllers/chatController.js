@@ -1,0 +1,72 @@
+const Resume = require("../models/Resume");
+const axios = require("axios");
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
+
+// @desc    Chat with AI Assistant (RAG) using a selected resume
+// @route   POST /api/chat
+// @access  Private
+const handleChat = async (req, res) => {
+  try {
+    const { message, resumeId, history } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ success: false, message: "Please provide a message" });
+    }
+
+    let payload = {
+      message,
+      history: history || [],
+    };
+
+    // If a resume ID is provided, retrieve its text and analytics details to feed the RAG context
+    if (resumeId) {
+      const resume = await Resume.findById(resumeId);
+      if (!resume) {
+        return res.status(404).json({ success: false, message: "Resume not found" });
+      }
+
+      // Check ownership
+      if (resume.userId.toString() !== req.user.id.toString()) {
+        return res.status(401).json({ success: false, message: "Not authorized to access this resume" });
+      }
+
+      payload.resume_text = resume.extractedText || "";
+      payload.skills = resume.skills || [];
+      payload.target_role = resume.recommendations?.targetRole || "Software Engineer";
+      payload.missing_skills = resume.recommendations?.missingSkills || [];
+      payload.roadmap = resume.recommendations?.roadmap || [];
+      payload.recommendedProjects = resume.recommendations?.recommendedProjects || [];
+      payload.interview_prep = resume.recommendations?.interviewPrep || {};
+      payload.name = resume.parsedData?.name || req.user.name || "Applicant";
+    } else {
+      // Default empty values for general chat when no resume is uploaded yet
+      payload.target_role = "Software Engineer";
+      payload.name = req.user.name || "Applicant";
+    }
+
+    // Call Python Service /chat endpoint
+    try {
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/chat`, payload, { timeout: 15000 });
+      return res.json({
+        success: true,
+        response: response.data.response,
+        is_fallback: response.data.is_fallback,
+        retrieved_chunks: response.data.retrieved_chunks,
+      });
+    } catch (apiError) {
+      console.error("Python NLP Service /chat error:", apiError.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to connect to AI Service. Make sure the FastAPI service is running.",
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  handleChat,
+};

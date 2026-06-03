@@ -12,6 +12,7 @@ import Upload from './pages/Upload';
 import Report from './pages/Report';
 import Profile from './pages/Profile';
 import CareerSuggestions from './pages/CareerSuggestions';
+import Chat from './pages/Chat';
 import PrivateRoute from './components/PrivateRoute';
 
 const App = () => {
@@ -33,6 +34,7 @@ const App = () => {
                 <Route path="/report/:id" element={<Report />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/career/:role" element={<CareerSuggestions />} />
+                <Route path="/chat" element={<Chat />} />
               </Route>
               {/* Fallback redirect */}
               <Route path="*" element={<Navigate to="/" replace />} />

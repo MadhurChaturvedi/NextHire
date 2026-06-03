@@ -16,7 +16,7 @@ nlp = spacy.load("en_core_web_sm")
 # List of tech skills compiled across frontend, backend, mobile, data science, ML, devops, database, languages
 SKILL_TAXONOMY = [
     # Programming Languages
-    "javascript", "typescript", "python", "java", "c++", "c", "go", "rust", "ruby", "php", "swift", "kotlin", "sql", "html", "css", "r", "scala", "shell", "bash",
+    "javascript", "typescript", "python", "java", "c++", "go", "rust", "ruby", "php", "swift", "kotlin", "sql", "html", "css", "r", "scala", "shell", "bash",
     # Frontend
     "react", "angular", "vue", "next.js", "nextjs", "nuxt", "gatsby", "redux", "svelte", "html5", "css3", "sass", "less", "tailwind", "bootstrap", "material ui", "webpack", "vite",
     # Backend & Frameworks
@@ -203,26 +203,53 @@ def extract_contact_info(text: str):
     email = email_match.group(0) if email_match else ""
     phone = phone_match.group(0) if phone_match else ""
     
+    # Post-process email to strip common prefix labels (e.g. "Envelope" or "email")
+    if email:
+        for prefix in ["envelope", "email", "mailto", "contact", "address", "phone"]:
+            if email.lower().startswith(prefix):
+                email = email[len(prefix):]
+                
+    # Blacklisted words that are definitely not PERSON names
+    BLACKLIST = {
+        "linkedin", "github", "resume", "curriculum", "vitae", "cv", 
+        "page", "email", "phone", "mobile", "address", "summary", 
+        "experience", "education", "skills", "projects", "certifications",
+        "developer", "engineer", "designer", "manager", "portfolio"
+    }
+    
+    def is_valid_name(name_str: str) -> bool:
+        name_lower = name_str.lower()
+        if not re.match(r'^[a-zA-Z\s\-]+$', name_str):
+            return False
+        # If any word in the name is in blacklist, it's invalid
+        words = name_lower.split()
+        for w in words:
+            if w in BLACKLIST:
+                return False
+        return True
+
     # Simple Name extraction heuristic
     # Look at spaCy NER PERSON tag first in the top portion of the resume
     doc = nlp(text[:800])
     name = ""
     for ent in doc.ents:
         if ent.label_ == "PERSON":
-            name = ent.text.strip()
+            val = ent.text.strip()
             # Clean up newlines or weird chars in name
-            name = re.sub(r'\s+', ' ', name)
-            # Make sure it contains letters and has reasonable length
-            if len(name) > 2 and re.match(r'^[a-zA-Z\s]+$', name):
+            val = re.sub(r'\s+', ' ', val)
+            # Make sure it contains letters, reasonable length, and is not blacklisted
+            if len(val) > 2 and is_valid_name(val):
+                name = val
                 break
     
-    # Fallback name extraction: get first line of text that has words
+    # Fallback name extraction: get first line of text that has words and is valid
     if not name:
         lines = [line.strip() for line in text.split("\n") if line.strip()]
-        for line in lines[:4]:
-            # If the line has 2-3 words, no numbers, no emails, no phone, it's likely a name
+        for line in lines[:6]:
+            # Clean up line whitespace
+            line = re.sub(r'\s+', ' ', line)
             words = line.split()
-            if 1 < len(words) < 5 and not any(char.isdigit() for char in line) and "@" not in line:
+            if 1 < len(words) < 5 and is_valid_name(line) and not any(char.isdigit() for char in line):
                 name = line
                 break
                 
@@ -234,6 +261,7 @@ def extract_contact_info(text: str):
         "email": email,
         "phone": phone
     }
+
 
 def extract_skills(text: str) -> list:
     """Extract skills from the resume text matching against our SKILL_TAXONOMY."""

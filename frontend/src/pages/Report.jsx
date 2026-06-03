@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { ArrowLeft, CheckCircle, XCircle, Sparkles, Target, Calendar, ArrowRight, FileText, Award } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Sparkles, Target, Calendar, ArrowRight, FileText, Award, MessageSquare } from 'lucide-react';
 
 const Report = () => {
   const { id } = useParams();
@@ -229,7 +229,15 @@ const Report = () => {
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <Link
+            to={`/chat?resumeId=${id}`}
+            state={{ resumeId: id }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 rounded-xl transition-colors font-bold"
+          >
+            <MessageSquare size={16} />
+            Chat with AI Assistant
+          </Link>
           <Link
             to="/dashboard"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"

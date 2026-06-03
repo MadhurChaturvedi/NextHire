@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sun, Moon, Menu, X, Cpu, LogOut, LayoutDashboard, UploadCloud, UserCircle2 } from 'lucide-react';
+import { Sun, Moon, Menu, X, Cpu, LogOut, LayoutDashboard, UploadCloud, UserCircle2, MessageSquare } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -67,6 +67,10 @@ const Navbar = () => {
                 <Link to="/upload" className={linkClass('/upload')}>
                   <UploadCloud size={16} />
                   Upload
+                </Link>
+                <Link to="/chat" className={linkClass('/chat')}>
+                  <MessageSquare size={16} className="text-indigo-500" />
+                  AI Assistant
                 </Link>
                 <Link to="/profile" className={linkClass('/profile')}>
                   <UserCircle2 size={16} />
@@ -162,6 +166,13 @@ const Navbar = () => {
                 onClick={() => setIsOpen(false)}
               >
                 Upload Resume
+              </Link>
+              <Link
+                to="/chat"
+                className="block px-3 py-2 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => setIsOpen(false)}
+              >
+                AI Assistant
               </Link>
               <Link
                 to="/profile"
