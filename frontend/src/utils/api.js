@@ -1,9 +1,15 @@
 import axios from "axios";
 
+// Use the deployed API URL directly for production.
+// Deployed backend URL (includes /api):
+const base = "https://next-gger.onrender.com/api";
+const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+
 const api = axios.create({
-  baseURL: "https://next-gger.onrender.com/api/" || "http://localhost:5000/api",
+  baseURL: normalizedBase,
   headers: {
     "Content-Type": "application/json",
+    Accept: "application/json",
   },
 });
 
