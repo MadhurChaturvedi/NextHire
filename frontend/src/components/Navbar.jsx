@@ -1,31 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Sun, Moon, Menu, X, Cpu, LogOut, LayoutDashboard, UploadCloud, UserCircle2, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import {
+  Sun,
+  Moon,
+  Menu,
+  X,
+  Cpu,
+  LogOut,
+  LayoutDashboard,
+  UploadCloud,
+  UserCircle2,
+  MessageSquare,
+} from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem('theme') === 'dark' || 
-      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  });
-
+  // Force light theme by default and remove dark-mode toggle
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    try {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } catch (e) {
+      // ignore
     }
-  }, [isDark]);
+  }, []);
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
     setIsOpen(false);
   };
 
@@ -33,9 +39,11 @@ const Navbar = () => {
 
   const linkClass = (path) => `
     flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-250
-    ${isActive(path) 
-      ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 font-semibold' 
-      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'}
+    ${
+      isActive(path)
+        ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 font-semibold"
+        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+    }
   `;
 
   return (
@@ -48,31 +56,34 @@ const Navbar = () => {
               <Cpu size={20} className="animate-pulse-slow" />
             </div>
             <span className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Next<span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Hire</span>
+              Next
+              <span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+                Hire
+              </span>
             </span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/features" className={linkClass('/features')}>
+            <Link to="/features" className={linkClass("/features")}>
               Features
             </Link>
-            
+
             {user ? (
               <>
-                <Link to="/dashboard" className={linkClass('/dashboard')}>
+                <Link to="/dashboard" className={linkClass("/dashboard")}>
                   <LayoutDashboard size={16} />
                   Dashboard
                 </Link>
-                <Link to="/upload" className={linkClass('/upload')}>
+                <Link to="/upload" className={linkClass("/upload")}>
                   <UploadCloud size={16} />
                   Upload
                 </Link>
-                <Link to="/chat" className={linkClass('/chat')}>
+                <Link to="/chat" className={linkClass("/chat")}>
                   <MessageSquare size={16} className="text-indigo-500" />
                   AI Assistant
                 </Link>
-                <Link to="/profile" className={linkClass('/profile')}>
+                <Link to="/profile" className={linkClass("/profile")}>
                   <UserCircle2 size={16} />
                   Profile
                 </Link>
@@ -82,19 +93,12 @@ const Navbar = () => {
 
           {/* Desktop Right items */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Theme Toggle */}
-            <button
-              onClick={() => setIsDark(!isDark)}
-              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/40 dark:border-slate-800/40 transition-colors"
-              aria-label="Toggle dark mode"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            {/* Light theme enforced by default; dark mode disabled */}
 
             {user ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Hi, {user.name.split(' ')[0]}
+                  Hi, {user.name.split(" ")[0]}
                 </span>
                 <button
                   onClick={handleLogout}
@@ -124,12 +128,7 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center gap-2 md:hidden">
-            <button
-              onClick={() => setIsDark(!isDark)}
-              className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+            {/* Dark mode toggle removed on mobile */}
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -150,7 +149,7 @@ const Navbar = () => {
           >
             Features
           </Link>
-          
+
           {user ? (
             <>
               <Link

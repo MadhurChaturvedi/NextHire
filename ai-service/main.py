@@ -147,7 +147,8 @@ def chat_endpoint(payload: ChatRequest):
     missing_str = ", ".join(payload.missing_skills) if payload.missing_skills else "None"
     
     system_prompt = f"""You are the NextHire AI Career Assistant — act like a human career coach and recruiter.
-Use a warm, conversational tone (short sentences, natural phrasing). Ask a clarifying follow-up question when helpful.
+Start your response with a short, friendly greeting addressing the user by name and (if possible) the time of day, e.g. "Good morning Alex!" or "Hi Alex!". Keep the tone warm, human, and practical.
+Use short sentences and natural phrasing. Ask a single clarifying follow-up question when helpful.
 
 Your goal is to help {payload.name} prepare for a role as a {payload.target_role}.
 
@@ -200,7 +201,7 @@ Guidelines for your response:
     return {
         "response": response_text,
         "is_fallback": is_fallback,
-        "retrieved_chunks": [r["chunk"] for r in retrieved]
+        "retrieved_chunks": retrieved
     }
 
 if __name__ == "__main__":

@@ -47,7 +47,8 @@ const uploadResume = async (req, res) => {
       extractedText: parseResult.text,
       skills: parseResult.skills,
       parsedData: {
-        name: parseResult.contact.name || "Unknown",
+        // store an empty string when name isn't found so frontend shows 'N/A'
+        name: parseResult.contact.name || "",
         email: parseResult.contact.email || "",
         phone: parseResult.contact.phone || "",
         education: parseResult.structure.education || "",
@@ -80,12 +81,10 @@ const analyzeResume = async (req, res) => {
     const { resumeId, targetRole } = req.body;
 
     if (!resumeId || !targetRole) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Please provide resumeId and targetRole",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide resumeId and targetRole",
+      });
     }
 
     const resume = await Resume.findById(resumeId);
@@ -97,12 +96,10 @@ const analyzeResume = async (req, res) => {
 
     // Make sure user owns this resume
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          message: "Not authorized to analyze this resume",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized to analyze this resume",
+      });
     }
 
     // Call Python Service /analyze endpoint. Fallback to mock AI if service unreachable.
@@ -179,12 +176,10 @@ const getResumeAnalysis = async (req, res) => {
 
     // Check ownership
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          message: "Not authorized to view this analysis",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized to view this analysis",
+      });
     }
 
     res.json({
@@ -231,12 +226,10 @@ const deleteResume = async (req, res) => {
 
     // Check ownership
     if (resume.userId.toString() !== req.user.id.toString()) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          message: "Not authorized to delete this resume",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized to delete this resume",
+      });
     }
 
     // Delete local file if it exists
@@ -268,12 +261,10 @@ const postCareerRecommendation = async (req, res) => {
     const { targetRole, skills } = req.body;
 
     if (!targetRole || !skills) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Please provide targetRole and skills",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide targetRole and skills",
+      });
     }
 
     // Call Python Service /analyze endpoint with custom variables. Fallback to mockAi.

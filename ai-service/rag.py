@@ -3,10 +3,22 @@ import re
 import json
 import urllib.request
 import urllib.error
+import hashlib
+import time
 from typing import List, Dict, Any, Optional
+
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 from utils import clean_text
+
+# Optional NLTK WordNet for simple query expansion (synonyms)
+try:
+    import nltk  # noqa: F401
+    from nltk.corpus import wordnet as wn
+except Exception:
+    wn = None
 
 def chunk_text(text: str, max_words: int = 120, overlap: int = 30) -> List[str]:
     """
@@ -52,15 +64,50 @@ def chunk_text(text: str, max_words: int = 120, overlap: int = 30) -> List[str]:
 
 def retrieve_relevant_chunks(query: str, chunks: List[str], top_k: int = 3) -> List[Dict[str, Any]]:
     """
-    Use TF-IDF Vectorizer and Cosine Similarity to find the top_k chunks matching the query.
+    Prefer semantic retrieval using embeddings (OpenAI or local SentenceTransformer) when available.
+    Falls back to TF-IDF + cosine similarity if embeddings are not available.
     """
     if not chunks or not query:
         return []
-    
     try:
         proc_chunks = [clean_text(c) for c in chunks]
         proc_query = clean_text(query)
+        # Expand query with synonyms when possible to improve recall
+        try:
+            proc_query = _expand_query(proc_query)
+        except Exception:
+            pass
 
+        # Try embeddings first (OpenAI or local SentenceTransformer)
+        embeddings = _get_or_build_embeddings(proc_chunks)
+        query_emb = _embed_query(proc_query)
+
+        if embeddings is not None and query_emb is not None:
+            # Compute cosine similarities in numpy
+            emb_arr = np.array(embeddings)
+            q = np.array(query_emb)
+            # Normalize
+            emb_norm = emb_arr / (np.linalg.norm(emb_arr, axis=1, keepdims=True) + 1e-8)
+            q_norm = q / (np.linalg.norm(q) + 1e-8)
+            sims = (emb_norm @ q_norm).flatten()
+            ranked_indices = np.argsort(sims)[::-1]
+
+            results: List[Dict[str, Any]] = []
+            for idx in ranked_indices[:min(max(top_k, 10), len(ranked_indices))]:
+                score = float(sims[idx])
+                results.append({"chunk": chunks[int(idx)], "score": score})
+
+            # Try to re-rank with a Cross-Encoder for better precision if available
+            try:
+                reranked = _rerank_with_cross_encoder(results, proc_query, top_k=top_k)
+                if reranked:
+                    return reranked
+            except Exception:
+                pass
+
+            return results[:top_k]
+
+        # Fallback to TF-IDF if embeddings unavailable
         vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1,2), max_features=5000)
         tfidf_matrix = vectorizer.fit_transform(proc_chunks)
         query_vec = vectorizer.transform([proc_query])
@@ -68,21 +115,15 @@ def retrieve_relevant_chunks(query: str, chunks: List[str], top_k: int = 3) -> L
         similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
         ranked_indices = similarities.argsort()[::-1]
 
-        results: List[Dict[str, Any]] = []
+        results = []
         for idx in ranked_indices[:min(top_k, len(ranked_indices))]:
             score = float(similarities[idx])
-            results.append({
-                "chunk": chunks[idx],
-                "score": score
-            })
-
-        if not results:
-            for idx in ranked_indices[:min(2, len(chunks))]:
-                results.append({"chunk": chunks[idx], "score": 0.0})
+            results.append({"chunk": chunks[idx], "score": score})
 
         return results
     except Exception as e:
         print(f"Error in chunk retrieval: {e}")
+        # Simple lexical fallback
         matched = []
         words = query.lower().split()
         for c in chunks:
@@ -182,6 +223,169 @@ def generate_llm_response(
     # 3. Dynamic Local Heuristic Fallback
     return ""
 
+
+# ---- Embedding helpers ----
+def _cache_path_for_chunks(chunks: List[str]) -> str:
+    cache_dir = os.path.join(os.path.dirname(__file__), '.cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    h = hashlib.sha256("||".join(chunks).encode('utf-8')).hexdigest()
+    return os.path.join(cache_dir, f'emb_{h}.json')
+
+
+def _get_or_build_embeddings(chunks: List[str]) -> Optional[List[List[float]]]:
+    """Return embeddings for chunks, using cache when available. Tries OpenAI, then local SentenceTransformer."""
+    if not chunks:
+        return None
+
+    cache_path = _cache_path_for_chunks(chunks)
+    # Attempt to load from cache
+    try:
+        if os.path.exists(cache_path):
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('embeddings')
+    except Exception:
+        pass
+
+    # 1) OpenAI embeddings if key present
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if openai_key:
+        try:
+            url = 'https://api.openai.com/v1/embeddings'
+            payload = {
+                'input': chunks,
+                'model': 'text-embedding-3-small'
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {openai_key}'
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                res = json.loads(resp.read().decode('utf-8'))
+                embeddings = [d['embedding'] for d in res.get('data', [])]
+                # cache
+                try:
+                    with open(cache_path, 'w', encoding='utf-8') as f:
+                        json.dump({'embeddings': embeddings, 'created': time.time()}, f)
+                except Exception:
+                    pass
+                return embeddings
+        except Exception as e:
+            print(f'OpenAI embeddings failed: {e}')
+
+    # 2) Local sentence-transformers if installed
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        embs = model.encode(chunks, show_progress_bar=False)
+        embeddings = [e.tolist() if hasattr(e, 'tolist') else list(e) for e in embs]
+        try:
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump({'embeddings': embeddings, 'created': time.time()}, f)
+        except Exception:
+            pass
+        return embeddings
+    except Exception:
+        pass
+
+    return None
+
+
+def _embed_query(query: str) -> Optional[List[float]]:
+    """Compute embedding for a single query using OpenAI or local model."""
+    if not query:
+        return None
+
+    openai_key = os.environ.get('OPENAI_API_KEY')
+    if openai_key:
+        try:
+            url = 'https://api.openai.com/v1/embeddings'
+            payload = {'input': query, 'model': 'text-embedding-3-small'}
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {openai_key}'
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                res = json.loads(resp.read().decode('utf-8'))
+                return res['data'][0]['embedding']
+        except Exception as e:
+            print(f'OpenAI query embedding failed: {e}')
+
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        emb = model.encode([query], show_progress_bar=False)[0]
+        return emb.tolist() if hasattr(emb, 'tolist') else list(emb)
+    except Exception:
+        return None
+
+
+def _expand_query(query: str, max_synonyms_per_word: int = 2) -> str:
+    """Best-effort query expansion using WordNet synonyms for nouns/adjectives/verbs.
+    Falls back to the original query if WordNet is unavailable.
+    """
+    if not query:
+        return query
+    if wn is None:
+        return query
+
+    words = re.findall(r"\w+", query)
+    extras = []
+    for w in words:
+        try:
+            synsets = wn.synsets(w)
+            if not synsets:
+                continue
+            lemmas = []
+            for s in synsets[:3]:
+                for l in s.lemmas()[:max_synonyms_per_word]:
+                    lem = l.name().replace('_', ' ')
+                    if lem.lower() != w.lower() and lem not in lemmas:
+                        lemmas.append(lem)
+            extras.extend(lemmas[:max_synonyms_per_word])
+        except Exception:
+            continue
+
+    if extras:
+        # Append unique extras
+        uniq = []
+        for e in extras:
+            if e not in uniq:
+                uniq.append(e)
+        return query + ' ' + ' '.join(uniq[:10])
+    return query
+
+
+def _rerank_with_cross_encoder(candidates: List[Dict[str, Any]], query: str, top_k: int = 3) -> Optional[List[Dict[str, Any]]]:
+    """Use a Cross-Encoder model to re-score (query, chunk) pairs for precision.
+    Returns reranked top_k candidates or None if the model isn't available.
+    """
+    if not candidates:
+        return None
+
+    try:
+        # Lazy import to avoid heavy dependency if not installed
+        from sentence_transformers import CrossEncoder
+        model_name = 'cross-encoder/ms-marco-MiniLM-L-6-v2'
+        model = CrossEncoder(model_name)
+        texts = [(query, c['chunk']) for c in candidates]
+        scores = model.predict(texts)
+        scored = []
+        for c, s in zip(candidates, scores):
+            scored.append({'chunk': c['chunk'], 'score': float(s)})
+        scored.sort(key=lambda x: x['score'], reverse=True)
+        return scored[:top_k]
+    except Exception:
+        return None
+
 def build_local_fallback(
     query: str,
     context: Dict[str, Any],
@@ -200,8 +404,21 @@ def build_local_fallback(
     interview_prep = context.get("interview_prep", {})
     name = context.get("name", "Applicant")
     
-    # Use a warmer, conversational intro instead of a formal chatbot header
-    intro = f"Hi {name}! \n\n"
+    # Time-aware, warmer conversational intro
+    try:
+        hour = time.localtime().tm_hour
+        if 5 <= hour < 12:
+            greet = 'Good morning'
+        elif 12 <= hour < 17:
+            greet = 'Good afternoon'
+        elif 17 <= hour < 22:
+            greet = 'Good evening'
+        else:
+            greet = 'Hi'
+    except Exception:
+        greet = 'Hi'
+
+    intro = f"{greet} {name}! \n\n"
     
     # 1. Ask about missing skills
     if any(word in q_lower for word in ["missing", "skill gap", "skills to learn", "lack"]):

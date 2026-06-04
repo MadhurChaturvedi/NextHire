@@ -242,20 +242,53 @@ def extract_contact_info(text: str):
                 name = val
                 break
     
-    # Fallback name extraction: get first line of text that has words and is valid
+    # Fallback name extraction: look for labeled "Name:" lines or title-case first lines
     if not name:
         lines = [line.strip() for line in text.split("\n") if line.strip()]
-        for line in lines[:6]:
-            # Clean up line whitespace
-            line = re.sub(r'\s+', ' ', line)
-            words = line.split()
-            if 1 < len(words) < 5 and is_valid_name(line) and not any(char.isdigit() for char in line):
-                name = line
-                break
-                
+
+        # 1) Look for explicit labels like 'Name: John Doe'
+        for line in lines[:10]:
+            m = re.search(r'^(?:name)\s*[:\-\s]{1,3}(.+)$', line, flags=re.I)
+            if m:
+                candidate = m.group(1).strip()
+                candidate = re.sub(r'\s+', ' ', candidate)
+                if 1 < len(candidate.split()) < 5 and is_valid_name(candidate):
+                    name = candidate
+                    break
+
+        # 2) If still not found, try a Title Case heuristic on the top lines (2-3 words, capitalized)
+        if not name:
+            for line in lines[:10]:
+                # ignore lines that are clearly headers or contain '@' or digits
+                if '@' in line or any(char.isdigit() for char in line):
+                    continue
+                # Candidate should be short (2-4 words) and mostly Title Case words
+                words = line.split()
+                if 1 < len(words) <= 4:
+                    title_like = sum(1 for w in words if re.match(r'^[A-Z][a-z\-]+$', w))
+                    if title_like >= max(1, len(words) - 1) and is_valid_name(line):
+                        name = line
+                        break
+
+    # If not found, leave name empty so frontend shows 'N/A' instead of a placeholder
     if not name:
-        name = "Unknown Applicant"
-        
+        name = ""
+
+    # Also try to extract email/phone from labeled lines if initial regex missed them
+    if not email:
+        for line in text.split("\n")[:20]:
+            m = re.search(r'(?:email|e-mail|e:)\s*[:\-\s]{0,3}([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', line, flags=re.I)
+            if m:
+                email = m.group(1).strip()
+                break
+
+    if not phone:
+        for line in text.split("\n")[:20]:
+            m = re.search(r'(?:phone|mobile|tel|contact)\s*[:\-\s]{0,3}((?:\+?\d[\d\s\-\(\)]{6,}\d))', line, flags=re.I)
+            if m:
+                phone = m.group(1).strip()
+                break
+
     return {
         "name": name,
         "email": email,
