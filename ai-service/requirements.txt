@@ -8,3 +8,4 @@ python-docx
 pydantic
 numpy
 sentence-transformers
+python-dotenv

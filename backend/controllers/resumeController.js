@@ -1,5 +1,6 @@
 const Resume = require("../models/Resume");
 const axios = require("axios");
+const FormData = require("form-data");
 const path = require("path");
 const fs = require("fs");
 
@@ -20,15 +21,24 @@ const uploadResume = async (req, res) => {
 
     const absolutePath = path.resolve(req.file.path);
 
-    // Call Python Service /parse endpoint. Fallback to mock AI if service unreachable.
+    // Call Python Service /parse-file endpoint by streaming the uploaded file.
+    // This avoids relying on the Python service having access to the same filesystem.
     let parseResult;
     try {
+      const form = new FormData();
+      form.append("file", fs.createReadStream(absolutePath), {
+        filename: req.file.originalname,
+      });
+
       const response = await axios.post(
-        `${PYTHON_SERVICE_URL}/parse`,
+        `${PYTHON_SERVICE_URL}/parse-file`,
+        form,
         {
-          file_path: absolutePath,
+          timeout: 10000,
+          headers: form.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
         },
-        { timeout: 5000 },
       );
       parseResult = response.data;
     } catch (apiError) {
@@ -65,6 +75,76 @@ const uploadResume = async (req, res) => {
     });
   } catch (error) {
     // Cleanup file in case of error
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Dev-only upload endpoint (no auth) - stores resume with a generated ObjectId user
+const uploadResumeDev = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please upload a file" });
+    }
+
+    const absolutePath = path.resolve(req.file.path);
+
+    let parseResult;
+    try {
+      const form = new FormData();
+      form.append("file", fs.createReadStream(absolutePath), {
+        filename: req.file.originalname,
+      });
+
+      const response = await axios.post(
+        `${PYTHON_SERVICE_URL}/parse-file`,
+        form,
+        {
+          timeout: 10000,
+          headers: form.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        },
+      );
+      parseResult = response.data;
+    } catch (apiError) {
+      console.warn(
+        "Python NLP Service parsing error, using local fallback:",
+        apiError.message,
+      );
+      parseResult = await mockAi.parse(absolutePath);
+    }
+
+    // Save to MongoDB with a generated ObjectId (dev only)
+    const { ObjectId } = require("mongodb");
+    const resume = await Resume.create({
+      userId: new ObjectId(),
+      filename: req.file.originalname,
+      filepath: absolutePath,
+      extractedText: parseResult.text,
+      skills: parseResult.skills,
+      parsedData: {
+        name: parseResult.contact.name || "",
+        email: parseResult.contact.email || "",
+        phone: parseResult.contact.phone || "",
+        education: parseResult.structure.education || "",
+        experience: parseResult.structure.experience || "",
+        certifications: parseResult.structure.certifications || "",
+        projects: parseResult.structure.projects || "",
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "(DEV) Resume uploaded and parsed successfully",
+      resume,
+    });
+  } catch (error) {
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -312,6 +392,7 @@ const postCareerRecommendation = async (req, res) => {
 
 module.exports = {
   uploadResume,
+  uploadResumeDev,
   analyzeResume,
   getResumeAnalysis,
   getResumeHistory,

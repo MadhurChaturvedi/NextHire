@@ -1,6 +1,10 @@
 import os
 import shutil
 import json
+from dotenv import load_dotenv
+
+# Load .env if present
+load_dotenv()
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

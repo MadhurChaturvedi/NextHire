@@ -26,3 +26,6 @@ const CareerRoleSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('CareerRole', CareerRoleSchema);
+
+
+
