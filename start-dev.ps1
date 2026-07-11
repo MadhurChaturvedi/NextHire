@@ -12,7 +12,7 @@ if (-not (Test-Path "ai-service/.venv")) {
 }
 
 Write-Host "Starting AI service (uvicorn) in new window..."
-Start-Process powershell -ArgumentList '-NoExit','-Command','cd ai-service; .\\venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload'
+Start-Process powershell -ArgumentList '-NoExit','-Command','cd ai-service; .\\.venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload'
 
 # 2) Backend
 Write-Host "Starting backend (installing dependencies if needed) in new window..."
