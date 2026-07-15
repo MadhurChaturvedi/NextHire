@@ -160,26 +160,23 @@ const analyzeResume = async (req, res) => {
       });
     }
 
+    // First, produce a deterministic analysis using local logic so scores and missing skills
+    // are reliable even if external AI is slow or inconsistent.
     let analyzeResult;
     try {
-      const result = await generateRagReply({
-        message: `Analyze this resume for the ${targetRole} role.`,
-        resumeText: resume.extractedText || "",
+      analyzeResult = await mockAi.analyze({
+        text: resume.extractedText || "",
         skills: resume.skills || [],
-        targetRole,
-        missingSkills: [],
-        roadmap: [],
-        recommendedProjects: [],
-        interviewPrep: {},
-        name: resume.parsedData?.name || "Applicant",
-        history: [],
+        target_role: targetRole,
       });
+    } catch (localErr) {
+      console.warn("Local analysis failed:", localErr.message);
       analyzeResult = {
         score: {
-          overall: 78,
-          skillRelevance: 78,
-          keywordDensity: 80,
-          structureScore: 75,
+          overall: 50,
+          skillRelevance: 40,
+          keywordDensity: 50,
+          structureScore: 50,
           checks: [],
         },
         matchingSkills: (resume.skills || []).slice(0, 6),
@@ -192,18 +189,45 @@ const analyzeResume = async (req, res) => {
           behavioral_guidance: "Use STAR method.",
           role_specific_focus: `Focus on ${targetRole} topics.`,
         },
-        response: result.response,
       };
+    }
+
+    // Then, request a narrative/insight from the RAG model to provide human-friendly suggestions.
+    try {
+      const result = await generateRagReply({
+        message: `Please provide a concise, actionable resume analysis for the role: ${targetRole}. Include top strengths, top 3 missing skills, and 3 quick improvement tips. Be concise.`,
+        resumeText: resume.extractedText || "",
+        skills: resume.skills || [],
+        targetRole,
+        missingSkills: analyzeResult.missingSkills || [],
+        roadmap: analyzeResult.roadmap || [],
+        recommendedProjects: analyzeResult.recommendedProjects || [],
+        interviewPrep: analyzeResult.interviewPrep || {},
+        name: resume.parsedData?.name || "Applicant",
+        history: [],
+      });
+      // attach narrative to analyzeResult for frontend display
+      analyzeResult.narrative = result.response;
     } catch (apiError) {
       console.warn(
-        "Groq AI analysis error, using local fallback:",
+        "Groq AI analysis error, using local narrative fallback:",
         apiError.message,
       );
-      analyzeResult = await mockAi.analyze({
-        text: resume.extractedText || "",
-        skills: resume.skills || [],
-        target_role: targetRole,
-      });
+      // If RAG fails, attempt to generate a short narrative from local analysis
+      const bullets = [];
+      bullets.push(`Overall ATS score: ${analyzeResult.score.overall}`);
+      if (analyzeResult.matchingSkills && analyzeResult.matchingSkills.length)
+        bullets.push(
+          `Matching skills: ${analyzeResult.matchingSkills.join(", ")}`,
+        );
+      if (analyzeResult.missingSkills && analyzeResult.missingSkills.length)
+        bullets.push(
+          `Missing skills: ${analyzeResult.missingSkills.join(", ")}`,
+        );
+      bullets.push(
+        "Top suggestions: focus on core missing skills, add measurable project outcomes, and tailor the summary to the role.",
+      );
+      analyzeResult.narrative = `(Fallback) ${bullets.join(" | ")}`;
     }
 
     // Update Resume document with score and recommendations

@@ -15,10 +15,45 @@ const handleChat = async (req, res) => {
         .json({ success: false, message: "Please provide a message" });
     }
 
+    // Basic payload and user name for quick responses
     let payload = {
       message,
       history: history || [],
     };
+
+    const userName = req.user?.name || "Applicant";
+
+    // Handle simple greetings locally for a helpful, contextual reply
+    try {
+      const trimmed = (message || "").trim().toLowerCase();
+      const greetPatterns = [
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "sup",
+        "who are you",
+        "what's your name",
+        "what is your name",
+      ];
+      const isGreeting = greetPatterns.some(
+        (p) =>
+          trimmed === p || trimmed.startsWith(p + " ") || trimmed.includes(p),
+      );
+
+      if (isGreeting) {
+        const reply = `Hello ${userName}! 👋 I'm NextHire — your AI career assistant. I can:\n- Analyze your resume and compute an ATS match score\n- Recommend a personalized learning roadmap\n- Suggest portfolio projects and interview prep\n- Run mock technical or behavioral interviews\n\nTry prompts like: "Analyze my resume", "Help me prepare for a Full Stack interview", or "Write a cover letter for a React developer." How can I help today?`;
+
+        return res.json({
+          success: true,
+          response: reply,
+          is_fallback: false,
+          retrieved_chunks: [],
+        });
+      }
+    } catch (greetErr) {
+      // ignore greeting handling errors and continue to normal flow
+    }
 
     // If a resume ID is provided, retrieve its text and analytics details to feed the RAG context
     if (resumeId) {

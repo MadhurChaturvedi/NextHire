@@ -45,7 +45,7 @@ const buildContextPayload = ({
     .join("\n");
 
   return {
-    systemPrompt: `You are NextHire, a career coach and interview mentor. Help the applicant with career advice, interview prep, roadmap guidance, and resume improvement. Speak clearly, be practical, and personalize responses using the context below. Applicant name: ${name}.`,
+    systemPrompt: `You are NextHire, a concise career coach and interview mentor. When asked to analyze a resume, produce a short, actionable summary listing top strengths, top 3 missing skills, and 3 quick improvement tips. Be practical and personalize responses using the context below. Applicant name: ${name}.`,
     input: {
       message,
       resumeContext: contextSections.join("\n"),
@@ -86,7 +86,7 @@ const generateRagReply = async ({
 
   const llm = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    model: process.env.GROQ_MODEL || "groq-1",
     temperature: 0.7,
     maxTokens: 700,
   });

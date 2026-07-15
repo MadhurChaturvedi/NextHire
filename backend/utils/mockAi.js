@@ -21,6 +21,75 @@ const defaultTemplate = {
   recommendedCertifications: [],
 };
 
+const pdf = require("pdf-parse");
+const mammoth = require("mammoth");
+
+async function extractTextFromFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".txt") {
+    return fs.readFileSync(filePath, "utf8");
+  }
+
+  if (ext === ".pdf") {
+    const data = fs.readFileSync(filePath);
+    try {
+      const res = await pdf(data);
+      return res.text || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  if (ext === ".docx" || ext === ".doc") {
+    try {
+      const res = await mammoth.extractRawText({ path: filePath });
+      return res.value || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  // fallback: read as utf8 if possible
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch (e) {
+    return "";
+  }
+}
+
+function extractContactInfo(text) {
+  const contact = { name: "Unknown Applicant", email: "", phone: "" };
+  if (!text) return contact;
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // Heuristic: first non-empty line is likely the name if it contains letters and spaces and no @ or digits
+  if (lines.length) {
+    const first = lines[0];
+    if (
+      /^[A-Za-z .'-]{2,60}$/.test(first) &&
+      !first.includes("@") &&
+      !/\d/.test(first)
+    ) {
+      contact.name = first;
+    }
+  }
+
+  // email
+  const emailMatch = text.match(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
+  );
+  if (emailMatch) contact.email = emailMatch[0];
+
+  // phone (basic international/local patterns)
+  const phoneMatch = text.match(/(\+?\d[\d\s().-]{6,}\d)/);
+  if (phoneMatch) contact.phone = phoneMatch[0];
+
+  return contact;
+}
+
 async function parse(filePath) {
   const result = {
     text: "",
@@ -35,25 +104,37 @@ async function parse(filePath) {
   };
 
   try {
-    if (fs.existsSync(filePath)) {
-      const ext = path.extname(filePath).toLowerCase();
-      if (ext === ".txt") {
-        result.text = fs.readFileSync(filePath, "utf8");
-      } else {
-        // For non-txt files return a minimal placeholder containing the filename
-        result.text = `Parsed placeholder text for file: ${path.basename(filePath)}`;
-      }
+    if (!fs.existsSync(filePath)) return result;
 
-      // crude skill extraction from filename
-      const nameLower = path.basename(filePath).toLowerCase();
-      if (nameLower.includes("react")) result.skills.push("react");
-      if (nameLower.includes("node")) result.skills.push("node.js");
-      if (nameLower.includes("python")) result.skills.push("python");
-    } else {
-      result.text = "";
+    const text = await extractTextFromFile(filePath);
+    result.text =
+      text || `Parsed placeholder text for file: ${path.basename(filePath)}`;
+
+    // contact extraction
+    result.contact = extractContactInfo(result.text);
+
+    // simple skill extraction using defaultTemplate
+    const textLower = (result.text || "").toLowerCase();
+    const skillsFound = new Set();
+    for (const s of defaultTemplate.skills) {
+      const key = s.toLowerCase();
+      // word boundary search for multi-word keys
+      const re = new RegExp("\\b" + key.replace(/[-.]/g, "\\$&") + "\\b", "i");
+      if (re.test(textLower)) skillsFound.add(key);
     }
+    result.skills = Array.from(skillsFound);
+
+    // basic structure extraction (look for headings)
+    const eduMatch = result.text.match(
+      /education[\s:\n\r]+([\s\S]{0,300}?)(\n\n|experience|projects|certifications|$)/i,
+    );
+    if (eduMatch) result.structure.education = eduMatch[1].trim();
+    const expMatch = result.text.match(
+      /experience[\s:\n\r]+([\s\S]{0,600}?)(\n\n|education|projects|certifications|$)/i,
+    );
+    if (expMatch) result.structure.experience = expMatch[1].trim();
   } catch (err) {
-    result.text = "";
+    // keep defaults on failure
   }
 
   return result;

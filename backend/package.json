@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "mammoth": "^1.4.21",
+    "pdf-parse": "^1.1.1",
     "@langchain/core": "^0.3.61",
     "@langchain/groq": "^0.2.0",
     "axios": "^1.16.1",
