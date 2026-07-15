@@ -13,11 +13,46 @@ const resumeRoutes = require("./routes/resumeRoutes");
 const careerRoleRoutes = require("./routes/careerRoleRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 
-// Connect to MongoDB Database
-connectDB().then(() => {
-  // Pre-populate CareerRoles if empty
-  seedRoles();
-});
+console.log("App router stack:");
+// Removed premature route inspection that runs before app is initialized
+// ((app._router && app._router.stack) || []).forEach((layer, i) => {
+//   try {
+//     console.log(
+//       "Layer",
+//       i,
+//       "name=",
+//       layer.name,
+//       "regexp=",
+//       layer.regexp && layer.regexp.toString(),
+//     );
+//     if (layer.route) {
+//       console.log(
+//         "  Route path=",
+//         layer.route.path,
+//         "methods=",
+//         Object.keys(layer.route.methods || {}),
+//       );
+//     }
+//     if (
+//       layer.name === "router" &&
+//       layer.handle &&
+//       Array.isArray(layer.handle.stack)
+//     ) {
+//       layer.handle.stack.forEach((l) => {
+//         if (l && l.route) {
+//           console.log(
+//             "   Subroute path=",
+//             l.route.path,
+//             "methods=",
+//             Object.keys(l.route.methods || {}),
+//           );
+//         }
+//       });
+//     }
+//   } catch (e) {
+//     console.warn("  Error inspecting layer", i, e.message);
+//   }
+// });
 
 const app = express();
 
@@ -62,6 +97,11 @@ app.use("/api/resumes", resumeRoutes);
 app.use("/api/career-roles", careerRoleRoutes);
 app.use("/api/chat", chatRoutes);
 
+// Quick test endpoint to validate POST reachability
+app.post("/api/chat-public-test", (req, res) => {
+  res.json({ success: true, message: "chat-public-test reachable" });
+});
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -89,20 +129,25 @@ app.listen(PORT, () => {
   console.log(`Server running in development mode on port ${PORT}`);
   // Debug: list registered routes
   try {
-    const routes = [];
-    app._router.stack.forEach((middleware) => {
-      if (middleware.route) {
-        // routes registered directly on the app
-        routes.push(middleware.route.path);
-      } else if (middleware.name === "router") {
-        middleware.handle.stack.forEach(function (handler) {
-          const route = handler.route;
-          route && routes.push(route.path);
-        });
+    console.log("App router stack:");
+    app._router.stack.forEach((layer, i) => {
+      const info = { index: i, name: layer.name };
+      if (layer.route) {
+        info.route = layer.route.path;
+        info.methods = layer.route.methods;
+      } else if (
+        layer.name === "router" &&
+        layer.handle &&
+        layer.handle.stack
+      ) {
+        info.router = layer.handle.stack.map((h) => ({
+          path: h.route?.path,
+          methods: h.route?.methods,
+        }));
       }
+      console.log(JSON.stringify(info));
     });
-    console.log("Registered routes:", routes);
   } catch (e) {
-    console.warn("Could not list routes:", e.message);
+    console.warn("Could not inspect router stack:", e.message);
   }
 });
