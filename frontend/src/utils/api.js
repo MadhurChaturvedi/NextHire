@@ -17,7 +17,7 @@ if (!rawBase) {
     rawBase =
       isBrowser && (hostname === "localhost" || hostname === "127.0.0.1")
         ? "http://localhost:5000/api"
-        : "https://next-gger.onrender.com/api";
+        : "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app/api";
   }
 }
 const base = rawBase.endsWith("/") ? rawBase.slice(0, -1) : rawBase;

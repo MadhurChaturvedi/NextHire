@@ -63,10 +63,24 @@ app.use(
   }),
 );
 
-// CORS Configuration
+// CORS Configuration - restrict to known frontends in production
+const allowedOrigins = [
+  process.env.FRONTEND_URL ||
+    "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
 app.use(
   cors({
-    origin: "*", // Allow all origins for local development/testing
+    origin: (origin, callback) => {
+      // allow requests with no origin (e.g., server-to-server, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(
+        new Error("CORS policy: This origin is not allowed: " + origin),
+      );
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
