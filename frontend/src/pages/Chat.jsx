@@ -140,7 +140,7 @@ const Chat = () => {
       // Add assistant message (show fallback hint when used)
       const content = response.data.response || "No response from AI.";
       const hint = response.data.is_fallback
-        ? "\n\n(Using local fallback. For richer replies, start the ai-service on port 8000.)"
+        ? "\n\n(Using local fallback because the Groq API is unavailable.)"
         : "";
       setMessages((prev) => [
         ...prev,
@@ -153,7 +153,7 @@ const Chat = () => {
         {
           role: "assistant",
           content:
-            "❌ **Error**: Failed to get response from AI. Please ensure the Python service is active.",
+            "❌ **Error**: Failed to get a response from AI. Please check the backend configuration and Groq API key.",
         },
       ]);
     } finally {

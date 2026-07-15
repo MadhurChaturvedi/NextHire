@@ -1,3 +1,13 @@
+:root {
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+html.dark :root {
+  color: #f8fafc;
+  background-color: #020617;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

@@ -1,9 +1,6 @@
 const Resume = require("../models/Resume");
-const axios = require("axios");
 const mockAi = require("../utils/mockAi");
-
-const PYTHON_SERVICE_URL =
-  process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
+const { generateRagReply } = require("../utils/aiService");
 
 // @desc    Chat with AI Assistant (RAG) using a selected resume
 // @route   POST /api/chat
@@ -34,12 +31,10 @@ const handleChat = async (req, res) => {
 
       // Check ownership
       if (resume.userId.toString() !== req.user.id.toString()) {
-        return res
-          .status(401)
-          .json({
-            success: false,
-            message: "Not authorized to access this resume",
-          });
+        return res.status(401).json({
+          success: false,
+          message: "Not authorized to access this resume",
+        });
       }
 
       payload.resume_text = resume.extractedText || "";
@@ -58,19 +53,27 @@ const handleChat = async (req, res) => {
       payload.name = req.user.name || "Applicant";
     }
 
-    // Call Python Service /chat endpoint; fall back to local mock AI if unavailable
     try {
-      const response = await axios.post(`${PYTHON_SERVICE_URL}/chat`, payload, {
-        timeout: 15000,
+      const response = await generateRagReply({
+        message: payload.message,
+        resumeText: payload.resume_text || "",
+        skills: payload.skills || [],
+        targetRole: payload.target_role || "Software Engineer",
+        missingSkills: payload.missing_skills || [],
+        roadmap: payload.roadmap || [],
+        recommendedProjects: payload.recommendedProjects || [],
+        interviewPrep: payload.interview_prep || {},
+        name: payload.name || "Applicant",
+        history: payload.history || [],
       });
       return res.json({
         success: true,
-        response: response.data.response,
-        is_fallback: response.data.is_fallback,
-        retrieved_chunks: response.data.retrieved_chunks,
+        response: response.response,
+        is_fallback: response.is_fallback,
+        retrieved_chunks: response.retrieved_chunks,
       });
     } catch (apiError) {
-      console.error("Python NLP Service /chat error:", apiError.message);
+      console.error("Groq AI chat error:", apiError.message);
       try {
         // Use local mock AI analyzer to provide a useful fallback response
         const analysis = await mockAi.analyze({

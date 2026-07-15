@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -19,15 +19,20 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  // Force light theme by default and remove dark-mode toggle
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "light";
+    const storedTheme = window.localStorage.getItem("theme");
+    if (storedTheme) return storedTheme;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
+
   useEffect(() => {
-    try {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } catch (e) {
-      // ignore
-    }
-  }, []);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const handleLogout = () => {
     logout();
@@ -93,8 +98,14 @@ const Navbar = () => {
 
           {/* Desktop Right items */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Light theme enforced by default; dark mode disabled */}
-
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-xl border border-slate-200/60 bg-white/80 p-2 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             {user ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -128,7 +139,14 @@ const Navbar = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center gap-2 md:hidden">
-            {/* Dark mode toggle removed on mobile */}
+            <button
+              type="button"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-xl border border-slate-200/60 bg-white/80 p-2 text-slate-600 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-300"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
