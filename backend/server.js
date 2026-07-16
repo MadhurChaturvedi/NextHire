@@ -69,6 +69,8 @@ const allowedOrigins = [
     "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app",
   // Added additional possible Vercel deployment domain (user-provided)
   "https://next-hire-67ji-2sdlpikdy-madhurcods-projects.vercel.app",
+  "next-hire-jy98-cla7uwg4x-madhurcods-projects.vercel.app",
+  "https://next-hire-jy98.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
