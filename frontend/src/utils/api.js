@@ -1,25 +1,29 @@
 import axios from "axios";
 
-// Prefer environment-provided API URL (Vite: VITE_API_URL).
-// If not provided, default to the local backend during development (http://localhost:5000/api),
-// otherwise default to the deployed backend.
+// Prefer Vite-provided API URL (`VITE_API_URL`).
+// Fallbacks:
+// - development: `http://localhost:5000/api`
+// - production: use `VITE_API_URL` if set, otherwise call relative `/api` (same origin).
 const envBase =
-  typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : undefined;
+  typeof import.meta !== "undefined" && import.meta.env
+    ? import.meta.env.VITE_API_URL
+    : undefined;
+const isProd =
+  typeof import.meta !== "undefined" && import.meta.env
+    ? !!import.meta.env.PROD
+    : process.env.NODE_ENV === "production";
+
 let rawBase = envBase;
 if (!rawBase) {
-  const isBrowser = typeof window !== "undefined";
-  const hostname = isBrowser ? window.location.hostname : "";
-  const isProd = process.env.NODE_ENV === "production";
-  // Prefer localhost backend during development to make the dev flow reliable.
   if (!isProd) {
     rawBase = "http://localhost:5000/api";
   } else {
-    rawBase =
-      isBrowser && (hostname === "localhost" || hostname === "127.0.0.1")
-        ? "http://localhost:5000/api"
-        : "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app/api";
+    // In production, prefer a relative `/api` so the frontend talks to the same origin
+    // unless an explicit `VITE_API_URL` was provided at build time.
+    rawBase = "/api";
   }
 }
+
 const base = rawBase.endsWith("/") ? rawBase.slice(0, -1) : rawBase;
 
 const api = axios.create({

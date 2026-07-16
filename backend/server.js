@@ -67,6 +67,8 @@ app.use(
 const allowedOrigins = [
   process.env.FRONTEND_URL ||
     "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app",
+  // Added additional possible Vercel deployment domain (user-provided)
+  "https://next-hire-67ji-2sdlpikdy-madhurcods-projects.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
