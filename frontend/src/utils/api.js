@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://next-hire-67ji-75wxxd2ko-madhurcods-projects.vercel.app/api",
+  baseURL:
+    "https://next-hire-67ji-81h4xz6bb-madhurcods-projects.vercel.app/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
