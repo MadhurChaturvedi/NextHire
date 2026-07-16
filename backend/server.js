@@ -65,12 +65,7 @@ app.use(
 
 // CORS Configuration - restrict to known frontends in production
 const allowedOrigins = [
-  process.env.FRONTEND_URL ||
-    "https://next-hire-67ji-4lougg8k2-madhurcods-projects.vercel.app",
-  // Added additional possible Vercel deployment domain (user-provided)
-  "https://next-hire-67ji-2sdlpikdy-madhurcods-projects.vercel.app",
-  "next-hire-jy98-cla7uwg4x-madhurcods-projects.vercel.app",
-  "https://next-hire-jy98.vercel.app",
+  process.env.FRONTEND_URL,
   "http://localhost:5173",
   "http://localhost:3000",
 ];
@@ -78,17 +73,29 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow requests with no origin (e.g., server-to-server, curl)
+      // Allow Postman, curl, server-to-server requests
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(
-        new Error("CORS policy: This origin is not allowed: " + origin),
-      );
+
+      // Allow localhost
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow every Vercel deployment
+      if (origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS Not Allowed: ${origin}`));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  }),
+  })
 );
+
+// Handle preflight requests
+app.options("*", cors());
 
 // Body parser
 app.use(express.json());
