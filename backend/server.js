@@ -64,12 +64,9 @@ app.use(
 );
 
 // CORS Configuration - restrict to known frontends in production
-  const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://next-gger.onrender.com",
-  ];
+const allowedOrigins = [
+  "*"
+];
 
 app.use(
   cors({
