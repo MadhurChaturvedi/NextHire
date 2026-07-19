@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://next-hire-67ji.vercel.app/api",
+  baseURL: "https://next-gger.onrender.com",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
