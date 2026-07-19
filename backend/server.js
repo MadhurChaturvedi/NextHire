@@ -152,29 +152,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running in development mode on port ${PORT}`);
-  // Debug: list registered routes
-  try {
-    console.log("App router stack:");
-    app._router.stack.forEach((layer, i) => {
-      const info = { index: i, name: layer.name };
-      if (layer.route) {
-        info.route = layer.route.path;
-        info.methods = layer.route.methods;
-      } else if (
-        layer.name === "router" &&
-        layer.handle &&
-        layer.handle.stack
-      ) {
-        info.router = layer.handle.stack.map((h) => ({
-          path: h.route?.path,
-          methods: h.route?.methods,
-        }));
-      }
-      console.log(JSON.stringify(info));
-    });
-  } catch (e) {
-    console.warn("Could not inspect router stack:", e.message);
-  }
+
+connectDB().then(() => {
+  seedRoles();
+  app.listen(PORT, () => {
+    console.log(`Server running in development mode on port ${PORT}`);
+  });
+}).catch((err) => {
+  console.error("Failed to connect to MongoDB:", err.message);
+  process.exit(1);
 });
+
