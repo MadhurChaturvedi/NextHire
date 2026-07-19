@@ -95,7 +95,7 @@ app.use(
 );
 
 // Handle preflight requests
-app.options("*", cors());
+// Preflight requests are automatically handled by the CORS middleware above
 
 // Body parser
 app.use(express.json());
