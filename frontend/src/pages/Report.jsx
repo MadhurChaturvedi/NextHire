@@ -2,18 +2,79 @@ import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import {
-  ArrowLeft,
-  CheckCircle,
-  XCircle,
-  Sparkles,
-  Target,
-  Calendar,
-  ArrowRight,
-  FileText,
-  Award,
-  MessageSquare,
+  ArrowLeft, CheckCircle, XCircle, Sparkles, Target,
+  ArrowRight, FileText, Award, MessageSquare,
+  User, Mail, Phone, Clock, BookOpen, Briefcase, Zap,
 } from "lucide-react";
 
+/* ── Circular SVG Score Ring ──────────────────────────────────── */
+const ScoreRing = ({ value = 0, size = 108, stroke = 9, color, label, suffix = "" }) => {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = Math.min(value / 100, 1) * circ;
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+            className="stroke-slate-100 dark:stroke-slate-800" strokeWidth={stroke} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke={color} strokeWidth={stroke}
+            strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+            style={{ transition: "stroke-dasharray 1s ease" }} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-extrabold text-slate-800 dark:text-slate-100">
+            {value}{suffix}
+          </span>
+        </div>
+      </div>
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 text-center">{label}</p>
+    </div>
+  );
+};
+
+/* ── Skill Chip ───────────────────────────────────────────────── */
+const Chip = ({ label, variant = "indigo" }) => {
+  const cls = {
+    indigo: "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/40",
+    rose:   "bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30",
+    emerald:"bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30",
+    amber:  "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30",
+  }[variant];
+  return (
+    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border ${cls}`}>
+      {label}
+    </span>
+  );
+};
+
+/* ── Section Card ─────────────────────────────────────────────── */
+const Section = ({ icon, title, accent = "indigo", children }) => {
+  const iconCls = {
+    indigo:  "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400",
+    rose:    "bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400",
+    purple:  "bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400",
+    emerald: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400",
+    amber:   "bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400",
+    sky:     "bg-sky-50 dark:bg-sky-950/30 text-sky-600 dark:text-sky-400",
+  }[accent];
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/60 dark:border-slate-800/40 shadow-sm mb-6">
+      <h2 className="flex items-center gap-3 text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
+        <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${iconCls}`}>
+          {icon}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════════
+   Report Page
+══════════════════════════════════════════════════════════════ */
 const Report = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -22,325 +83,245 @@ const Report = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchResume = async () => {
-      try {
-        const response = await api.get(`/resumes/${id}`);
-        setResume(response.data.resume);
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load resume report.");
-        setLoading(false);
-      }
-    };
-    fetchResume();
+    api.get(`/resumes/${id}`)
+      .then(r => { setResume(r.data.resume); setLoading(false); })
+      .catch(() => { setError("Failed to load resume report."); setLoading(false); });
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      <p className="text-sm text-slate-500 dark:text-slate-400">Loading your report…</p>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
-        <p className="text-rose-600 dark:text-rose-400 mb-4">{error}</p>
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl"
-        >
-          Back to Dashboard
-        </button>
-      </div>
-    );
-  }
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <XCircle size={40} className="text-rose-500" />
+      <p className="text-rose-600 dark:text-rose-400 font-semibold">{error}</p>
+      <button onClick={() => navigate("/dashboard")}
+        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-colors">
+        Back to Dashboard
+      </button>
+    </div>
+  );
 
-  const { score, recommendations, filename, uploadedAt, parsedData, skills } =
-    resume || {};
-
-  // If no score yet (resume uploaded but not analyzed), show a prompt
-  const isAnalyzed = score && score.overall !== undefined;
+  const { score, recommendations, filename, uploadedAt, parsedData, skills } = resume || {};
+  const isAnalyzed = score?.overall !== undefined;
 
   return (
-    <div className="flex-1 bg-slate-50 text-slate-900 transition-colors py-12">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft
-              size={20}
-              className="text-slate-600 dark:text-slate-300"
-            />
-          </button>
-          <h1 className="font-display text-3xl font-bold">
-            Resume Analysis Report
-          </h1>
-        </div>
+    <div className="flex-1 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 py-10">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
 
-        {/* Basic Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="rounded-2xl overflow-hidden shadow-lg">
-            <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center gap-3">
-              <FileText size={18} />
+        {/* Back button */}
+        <button onClick={() => navigate("/dashboard")}
+          className="inline-flex items-center gap-2 mb-6 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+          <ArrowLeft size={16} /> Back to Dashboard
+        </button>
+
+        {/* Page title */}
+        <h1 className="font-display text-3xl font-extrabold tracking-tight mb-8
+          bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          Resume Analysis Report
+        </h1>
+
+        {/* ── Info Grid ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          {/* File Details */}
+          <div className="rounded-2xl overflow-hidden border border-slate-200/60 dark:border-slate-800/40 shadow-sm">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center gap-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/20">
+                <FileText size={17} className="text-white" />
+              </div>
               <div>
-                <div className="font-semibold">File Details</div>
-                <div className="text-xs opacity-90">{filename}</div>
+                <p className="text-white font-bold text-sm">File Details</p>
+                <p className="text-indigo-100 text-xs mt-0.5 truncate max-w-[200px]">{filename}</p>
               </div>
             </div>
-            <div className="bg-white p-6 border border-slate-200/40">
-              <p className="text-sm">
-                <strong>Name:</strong> {parsedData?.name || "Not provided"}
-              </p>
-              <p className="text-sm">
-                <strong>Email:</strong> {parsedData?.email || "Not provided"}
-              </p>
-              <p className="text-sm">
-                <strong>Phone:</strong> {parsedData?.phone || "Not provided"}
-              </p>
-              <p className="text-sm mt-2">
-                <strong>Uploaded:</strong>{" "}
-                {uploadedAt ? new Date(uploadedAt).toLocaleString() : "Unknown"}
-              </p>
+            <div className="bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+              {[
+                { icon: <User size={13} />,   label: "Name",     val: parsedData?.name },
+                { icon: <Mail size={13} />,   label: "Email",    val: parsedData?.email },
+                { icon: <Phone size={13} />,  label: "Phone",    val: parsedData?.phone },
+                { icon: <Clock size={13} />,  label: "Uploaded", val: uploadedAt ? new Date(uploadedAt).toLocaleString() : null },
+              ].map(({ icon, label, val }) => (
+                <div key={label} className="flex items-center gap-3 px-5 py-3 text-sm">
+                  <span className="text-indigo-500 dark:text-indigo-400 shrink-0">{icon}</span>
+                  <span className="font-semibold text-slate-600 dark:text-slate-300 w-16 shrink-0">{label}</span>
+                  <span className="text-slate-500 dark:text-slate-400 truncate">{val || "Not provided"}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/40">
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Target size={18} className="text-purple-600" />
+
+          {/* Target Role */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/40">
+              <Target size={22} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
               Target Role
-            </h2>
-            <p className="text-xl font-bold text-indigo-600">
-              {recommendations?.targetRole || "N/A"}
+            </p>
+            <p className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400 leading-tight">
+              {recommendations?.targetRole || "Not set"}
             </p>
           </div>
         </div>
 
-        {/* Score Card */}
+        {/* ── Score Rings ── */}
         {isAnalyzed ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/40 dark:border-slate-800/40 text-center">
-              <div className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400">
-                {score?.overall || "—"}
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Overall ATS Score
-              </p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/40 dark:border-slate-800/40 text-center">
-              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                {score?.skillRelevance || "—"}%
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Skill Relevance
-              </p>
-            </div>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200/40 dark:border-slate-800/40 text-center">
-              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                {score?.keywordDensity || "—"}%
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Keyword Similarity
-              </p>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/60 dark:border-slate-800/40 shadow-sm p-6 mb-6">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-6 text-center">
+              ATS Score Breakdown
+            </h2>
+            <div className="flex flex-wrap justify-around items-center gap-8">
+              <ScoreRing value={score.overall}              color="#4f46e5" label="Overall ATS Score"    size={120} stroke={10} />
+              <div className="w-px h-20 bg-slate-100 dark:bg-slate-800 hidden md:block" />
+              <ScoreRing value={score.skillRelevance ?? 0} color="#7c3aed" label="Skill Relevance"      suffix="%" />
+              <div className="w-px h-20 bg-slate-100 dark:bg-slate-800 hidden md:block" />
+              <ScoreRing value={score.keywordDensity ?? 0} color="#0ea5e9" label="Keyword Similarity"   suffix="%" />
             </div>
           </div>
         ) : (
-          <div className="mb-8 p-6 rounded-2xl bg-amber-50 border border-amber-200/40 text-center">
-            <p className="text-amber-700 font-medium mb-2">
-              This resume hasn't been analyzed yet.
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-7 mb-6 text-center">
+            <Zap size={32} className="text-amber-500 mx-auto mb-3" />
+            <p className="font-bold text-amber-800 dark:text-amber-300 mb-1">Not Analyzed Yet</p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 mb-5">
+              Go to Dashboard → click "Analyze ATS Match" to score this resume.
             </p>
-            <p className="text-sm text-amber-600 mb-4">
-              Go back to the Dashboard and click "Analyze ATS Match" to run an
-              analysis against a target role.
-            </p>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-colors"
-            >
+            <button onClick={() => navigate("/dashboard")}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition-colors">
               Go to Dashboard
             </button>
           </div>
         )}
 
-        {/* Skills */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-            <Sparkles size={20} className="text-indigo-600" />
-            Extracted Skills ({skills?.length || 0})
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {skills && skills.length > 0 ? (
-              skills.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-sm font-medium"
-                >
-                  {skill}
-                </span>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">No skills detected.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Missing Skills */}
-        {recommendations?.missingSkills &&
-          recommendations.missingSkills.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                <XCircle size={20} className="text-rose-600" />
-                Missing Core Skills
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {recommendations.missingSkills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1 bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 rounded-full text-sm font-medium"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+        {/* ── Extracted Skills ── */}
+        {skills?.length > 0 && (
+          <Section icon={<Sparkles size={15} />} title={`Extracted Skills (${skills.length})`} accent="indigo">
+            <div className="flex flex-wrap gap-2">
+              {skills.map((sk, i) => <Chip key={i} label={sk} variant="indigo" />)}
             </div>
-          )}
-
-        {/* Roadmap */}
-        {recommendations?.roadmap && recommendations.roadmap.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Target size={20} className="text-purple-600" />
-              Learning Roadmap
-            </h2>
-            <ol className="space-y-4">
-              {recommendations.roadmap.map((step, idx) => (
-                <li
-                  key={idx}
-                  className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/40 dark:border-slate-800/40 shadow-sm"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold">
-                      {step.step}
-                    </span>
-                    <h3 className="font-medium text-slate-800 dark:text-slate-200">
-                      {step.title}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                    {step.description}
-                  </p>
-                  {step.resources && (
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400">
-                      Resources: {step.resources}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </div>
+          </Section>
         )}
 
-        {/* Recommended Projects */}
-        {recommendations?.recommendedProjects &&
-          recommendations.recommendedProjects.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <CheckCircle size={20} className="text-emerald-600" />
-                Project Recommendations
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {recommendations.recommendedProjects.map((proj, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200/40 dark:border-slate-800/40 shadow-sm"
-                  >
-                    <h3 className="font-medium text-indigo-600 dark:text-indigo-400 mb-1">
-                      {proj.title}
-                    </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                      {proj.description}
-                    </p>
-                    {proj.techStack && (
-                      <p className="text-xs text-slate-500">
-                        Tech Stack: {proj.techStack}
+        {/* ── Missing Skills ── */}
+        {recommendations?.missingSkills?.length > 0 && (
+          <Section icon={<XCircle size={15} />} title="Missing Core Skills" accent="rose">
+            <div className="flex flex-wrap gap-2">
+              {recommendations.missingSkills.map((sk, i) => <Chip key={i} label={sk} variant="rose" />)}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Learning Roadmap ── */}
+        {recommendations?.roadmap?.length > 0 && (
+          <Section icon={<BookOpen size={15} />} title="Learning Roadmap" accent="purple">
+            <ol className="space-y-4">
+              {recommendations.roadmap.map((step, idx) => (
+                <li key={idx} className="flex gap-4 relative">
+                  {idx < recommendations.roadmap.length - 1 && (
+                    <div className="absolute left-[17px] top-9 w-0.5 h-full bg-gradient-to-b from-indigo-300 dark:from-indigo-700 to-transparent" />
+                  )}
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm z-10">
+                    {step.step}
+                  </div>
+                  <div className="flex-1 bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 border border-slate-200/60 dark:border-slate-700/40">
+                    <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100 mb-1">{step.title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{step.description}</p>
+                    {step.resources && (
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2 font-medium">
+                        📎 {step.resources}
                       </p>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        {/* Certifications */}
-        {recommendations?.recommendedCertifications &&
-          recommendations.recommendedCertifications.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                <Award size={20} className="text-amber-600" />
-                Suggested Certifications
-              </h2>
-              <ul className="list-disc list-inside space-y-1">
-                {recommendations.recommendedCertifications.map((cert, idx) => (
-                  <li key={idx} className="text-slate-700 dark:text-slate-300">
-                    {cert}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-        {/* Interview Prep */}
-        {recommendations?.interviewPrep && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <ArrowRight size={20} className="text-indigo-600" />
-              Interview Preparation
-            </h2>
-            <div className="space-y-4">
-              {recommendations.interviewPrep.technical_questions &&
-                recommendations.interviewPrep.technical_questions.length >
-                  0 && (
-                  <div>
-                    <h3 className="font-medium mb-2">Technical Questions</h3>
-                    <ul className="list-disc list-inside space-y-1 text-sm">
-                      {recommendations.interviewPrep.technical_questions.map(
-                        (q, idx) => (
-                          <li key={idx}>{q}</li>
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                )}
-              {recommendations.interviewPrep.behavioral_guidance && (
-                <p className="text-sm">
-                  {recommendations.interviewPrep.behavioral_guidance}
-                </p>
-              )}
-            </div>
-          </div>
+                </li>
+              ))}
+            </ol>
+          </Section>
         )}
 
-        <div className="flex justify-end gap-3">
-          <Link
-            to={`/chat?resumeId=${id}`}
-            state={{ resumeId: id }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 rounded-xl transition-colors font-bold"
-          >
-            <MessageSquare size={16} />
-            Chat with AI Assistant
+        {/* ── Project Recommendations ── */}
+        {recommendations?.recommendedProjects?.length > 0 && (
+          <Section icon={<Briefcase size={15} />} title="Project Recommendations" accent="emerald">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {recommendations.recommendedProjects.map((proj, idx) => (
+                <div key={idx} className="bg-emerald-50 dark:bg-emerald-950/20 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900/30">
+                  <h3 className="font-bold text-sm text-emerald-700 dark:text-emerald-400 mb-1">{proj.title}</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-2">{proj.description}</p>
+                  {proj.techStack && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {proj.techStack.split(",").map((t, i) => (
+                        <Chip key={i} label={t.trim()} variant="emerald" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Certifications ── */}
+        {recommendations?.recommendedCertifications?.length > 0 && (
+          <Section icon={<Award size={15} />} title="Suggested Certifications" accent="amber">
+            <div className="flex flex-col gap-2">
+              {recommendations.recommendedCertifications.map((cert, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl px-4 py-3 border border-amber-100 dark:border-amber-900/30">
+                  <Award size={15} className="text-amber-500 shrink-0" />
+                  <span className="text-sm font-medium text-amber-800 dark:text-amber-300">{cert}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Interview Prep ── */}
+        {recommendations?.interviewPrep && (
+          <Section icon={<MessageSquare size={15} />} title="Interview Preparation" accent="sky">
+            {recommendations.interviewPrep.technical_questions?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+                  Technical Questions
+                </p>
+                <div className="space-y-2">
+                  {recommendations.interviewPrep.technical_questions.map((q, i) => (
+                    <div key={i} className="flex gap-3 items-start bg-sky-50 dark:bg-sky-950/20 rounded-xl px-4 py-3 border border-sky-100 dark:border-sky-900/30">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-sky-500 text-white text-[10px] font-bold flex items-center justify-center mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{q}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {recommendations.interviewPrep.behavioral_guidance && (
+              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-xl px-4 py-3 border border-slate-200/60 dark:border-slate-700/40 text-sm text-slate-600 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Behavioral Guidance: </span>
+                {recommendations.interviewPrep.behavioral_guidance}
+              </div>
+            )}
+          </Section>
+        )}
+
+        {/* ── Action Buttons ── */}
+        <div className="flex justify-end gap-3 mt-2">
+          <Link to={`/chat?resumeId=${id}`} state={{ resumeId: id }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold
+              bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400
+              border border-indigo-100 dark:border-indigo-900/40
+              hover:bg-indigo-100 dark:hover:bg-indigo-950/60 transition-colors">
+            <MessageSquare size={15} /> Chat with AI
           </Link>
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"
-          >
-            Back to Dashboard
-            <ArrowRight size={16} />
+          <Link to="/dashboard"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold
+              bg-indigo-600 hover:bg-indigo-500 text-white transition-colors
+              shadow-md shadow-indigo-600/20">
+            Back to Dashboard <ArrowRight size={15} />
           </Link>
         </div>
+
       </div>
     </div>
   );
