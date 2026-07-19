@@ -56,6 +56,10 @@ console.log("App router stack:");
 
 const app = express();
 
+// Trust the first proxy hop (required on Render / any reverse-proxy host)
+// so that express-rate-limit can read X-Forwarded-For correctly.
+app.set("trust proxy", 1);
+
 // Security Middlewares
 app.use(
   helmet({
