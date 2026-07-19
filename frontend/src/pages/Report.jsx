@@ -13,7 +13,7 @@ const ScoreRing = ({ value = 0, size = 108, stroke = 9, color, label, suffix = "
   const circ = 2 * Math.PI * r;
   const dash = Math.min(value / 100, 1) * circ;
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 bg-slate-950">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
           <circle cx={size / 2} cy={size / 2} r={r} fill="none"
